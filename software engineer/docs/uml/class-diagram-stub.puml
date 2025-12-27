@@ -1,0 +1,55 @@
+@startuml
+skinparam packageStyle rectangle
+skinparam shadowing false
+
+' NOTE: This is a stub listing classes/enums only.
+' Add attributes/methods + relationships after exporting full UML.
+
+enum UserRole
+enum LanguageLevel
+enum AssignmentStatus
+enum ContentType
+
+abstract class User
+class Student
+class Teacher
+class Admin
+
+class Reward
+class StudentReward
+
+abstract class Test
+class WritingTest
+class SpeakingTest
+class ListeningTest
+class ReadingTest
+class PlacementTest
+
+class TestResult
+class SpeakingResult
+
+class LessonPlan
+class Progress
+class ProgressSnapshot
+
+class ChatSession
+class ChatMessage
+
+class Feedback
+
+class Message
+class Announcement
+
+class Assignment
+class StudentAssignment
+
+class Content
+class Topic
+class TestModule
+class Exercise
+class Question
+
+class SystemPerformance
+class MaintenanceLog
+
+@enduml
