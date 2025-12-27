@@ -1,0 +1,76 @@
+# ===== OS / System =====
+.DS_Store
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# ===== Logs =====
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ===== Node / Package managers =====
+node_modules/
+.pnp
+.pnp.js
+
+# lockfiles (keep ONE lockfile tracked per package manager)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# ===== Build outputs =====
+dist/
+build/
+out/
+.tmp/
+.temp/
+.cache/
+
+# Vite
+frontend/dist/
+frontend/.vite/
+
+# Backend common outputs
+backend/dist/
+backend/build/
+
+# ===== TypeScript =====
+*.tsbuildinfo
+
+# ===== Test / Coverage =====
+coverage/
+.nyc_output/
+
+# ===== Env / Secrets =====
+.env
+.env.*
+!.env.example
+
+# ===== Prisma =====
+# Keep schema and migrations tracked; ignore local/generated artifacts
+backend/prisma/.env
+
+# ===== Docker =====
+**/docker-data/
+
+# ===== IDEs / Editors =====
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/tasks.json
+
+.idea/
+*.iml
+
+# ===== Misc =====
+*.local
+
+# ===== Optional: ignore generated API clients, etc. =====
+# src/generated/

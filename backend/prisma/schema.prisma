@@ -1,0 +1,570 @@
+// =============================================================================
+// Prisma Schema for PersonalizedAI Learning Platform
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// Enums
+// =============================================================================
+
+enum UserRole {
+  STUDENT
+  TEACHER
+  ADMIN
+}
+
+enum LanguageLevel {
+  A1
+  A2
+  B1
+  B2
+  C1
+  C2
+}
+
+enum AssignmentStatus {
+  PENDING
+  IN_PROGRESS
+  SUBMITTED
+  GRADED
+  LATE
+}
+
+enum ContentType {
+  LESSON
+  EXERCISE
+  QUIZ
+  VIDEO
+  AUDIO
+  READING
+  ROLEPLAY
+}
+
+enum TestType {
+  PLACEMENT
+  READING
+  WRITING
+  LISTENING
+  SPEAKING
+}
+
+enum FeedbackType {
+  BUG_REPORT
+  SUGGESTION
+  CONTENT_ISSUE
+  GENERAL
+}
+
+enum RewardType {
+  BADGE
+  POINTS
+  ACHIEVEMENT
+}
+
+// =============================================================================
+// User Models
+// =============================================================================
+
+model User {
+  id              String    @id @default(uuid())
+  email           String    @unique
+  passwordHash    String
+  firstName       String
+  lastName        String
+  role            UserRole
+  isEmailVerified Boolean   @default(false)
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Student-specific fields
+  readingLevel    LanguageLevel?
+  writingLevel    LanguageLevel?
+  listeningLevel  LanguageLevel?
+  speakingLevel   LanguageLevel?
+  overallLevel    LanguageLevel?
+  dailyStreak     Int       @default(0)
+  lastActiveAt    DateTime?
+  totalPoints     Int       @default(0)
+  
+  // Teacher relationship
+  teacherId       String?
+  teacher         User?     @relation("TeacherStudents", fields: [teacherId], references: [id])
+  students        User[]    @relation("TeacherStudents")
+
+  // Related data
+  progress        Progress?
+  testResults     TestResult[]
+  lessonPlans     LessonPlan[]
+  studentAssignments StudentAssignment[]
+  assignmentsCreated Assignment[]
+  sentMessages    Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
+  announcements   Announcement[]
+  chatSessions    ChatSession[]
+  feedback        Feedback[]
+  studentRewards  StudentReward[]
+  pointTransactions PointTransaction[]
+  dailyActivities DailyActivity[]
+
+  @@index([email])
+  @@index([role])
+  @@index([teacherId])
+}
+
+// =============================================================================
+// Test Models
+// =============================================================================
+
+model Test {
+  id              String    @id @default(uuid())
+  type            TestType
+  title           String
+  description     String
+  duration        Int       // in minutes
+  totalQuestions  Int
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  modules         TestModule[]
+  results         TestResult[]
+
+  @@index([type])
+}
+
+model TestModule {
+  id              String    @id @default(uuid())
+  testId          String
+  test            Test      @relation(fields: [testId], references: [id], onDelete: Cascade)
+  type            TestType
+  title           String
+  order           Int
+
+  questions       Question[]
+
+  @@index([testId])
+}
+
+model Question {
+  id              String    @id @default(uuid())
+  moduleId        String
+  module          TestModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  content         String
+  type            String    // multiple_choice, text_input, audio_response, written_response
+  options         String[]
+  correctAnswer   String?
+  points          Int
+  audioUrl        String?
+  imageUrl        String?
+  order           Int
+
+  @@index([moduleId])
+}
+
+model TestResult {
+  id              String    @id @default(uuid())
+  testId          String
+  test            Test      @relation(fields: [testId], references: [id])
+  studentId       String
+  student         User      @relation(fields: [studentId], references: [id])
+  type            TestType
+  score           Float
+  maxScore        Float
+  percentage      Float
+  level           LanguageLevel
+  completedAt     DateTime
+  timeSpent       Int       // in seconds
+  answers         Json      // Array of AnswerRecord
+
+  @@index([studentId])
+  @@index([testId])
+  @@index([completedAt])
+}
+
+model SpeakingResult {
+  id                  String    @id @default(uuid())
+  testResultId        String
+  pronunciationScore  Float
+  fluencyScore        Float
+  grammarScore        Float
+  vocabularyScore     Float
+  audioRecordingUrl   String
+}
+
+// =============================================================================
+// Content Models
+// =============================================================================
+
+model Topic {
+  id              String    @id @default(uuid())
+  name            String
+  description     String
+  category        String    // grammar, vocabulary, pronunciation, speaking, listening, reading, writing
+  level           LanguageLevel
+  order           Int
+  parentTopicId   String?
+  parentTopic     Topic?    @relation("TopicHierarchy", fields: [parentTopicId], references: [id])
+  childTopics     Topic[]   @relation("TopicHierarchy")
+
+  contents        Content[]
+
+  @@index([level])
+  @@index([category])
+}
+
+model Content {
+  id              String      @id @default(uuid())
+  type            ContentType
+  title           String
+  description     String
+  level           LanguageLevel
+  topicId         String
+  topic           Topic       @relation(fields: [topicId], references: [id])
+  content         String      // JSON or HTML content
+  duration        Int         // estimated minutes
+  order           Int
+  isAiGenerated   Boolean     @default(false)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  exercises       Exercise[]
+  lessonPlanItems LessonPlanItem[]
+
+  @@index([topicId])
+  @@index([level])
+  @@index([type])
+}
+
+model Exercise {
+  id              String    @id @default(uuid())
+  contentId       String
+  content         Content   @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  type            String    // fill_blank, multiple_choice, matching, ordering, free_text, audio_response
+  question        String
+  options         String[]
+  correctAnswer   String
+  explanation     String
+  hints           String[]
+  points          Int
+
+  @@index([contentId])
+}
+
+model LessonPlan {
+  id              String    @id @default(uuid())
+  studentId       String
+  student         User      @relation(fields: [studentId], references: [id])
+  title           String
+  description     String
+  level           LanguageLevel
+  startDate       DateTime
+  endDate         DateTime?
+  isActive        Boolean   @default(true)
+  aiRationale     String    // Why this plan was generated
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  items           LessonPlanItem[]
+
+  @@index([studentId])
+  @@index([isActive])
+}
+
+model LessonPlanItem {
+  id              String      @id @default(uuid())
+  lessonPlanId    String
+  lessonPlan      LessonPlan  @relation(fields: [lessonPlanId], references: [id], onDelete: Cascade)
+  contentId       String
+  content         Content     @relation(fields: [contentId], references: [id])
+  order           Int
+  isCompleted     Boolean     @default(false)
+  completedAt     DateTime?
+  score           Float?
+
+  @@index([lessonPlanId])
+}
+
+// =============================================================================
+// Progress Models
+// =============================================================================
+
+model Progress {
+  id                      String    @id @default(uuid())
+  studentId               String    @unique
+  student                 User      @relation(fields: [studentId], references: [id])
+  totalLessonsCompleted   Int       @default(0)
+  totalExercisesCompleted Int       @default(0)
+  totalTestsTaken         Int       @default(0)
+  averageScore            Float     @default(0)
+  currentStreak           Int       @default(0)
+  longestStreak           Int       @default(0)
+  totalStudyTime          Int       @default(0) // in minutes
+  lastActivityAt          DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  snapshots               ProgressSnapshot[]
+
+  @@index([studentId])
+}
+
+model ProgressSnapshot {
+  id                  String    @id @default(uuid())
+  progressId          String
+  progress            Progress  @relation(fields: [progressId], references: [id], onDelete: Cascade)
+  date                DateTime
+  lessonsCompleted    Int
+  exercisesCompleted  Int
+  studyTimeMinutes    Int
+  averageScore        Float
+  readingLevel        LanguageLevel
+  writingLevel        LanguageLevel
+  listeningLevel      LanguageLevel
+  speakingLevel       LanguageLevel
+
+  @@index([progressId])
+  @@index([date])
+}
+
+model DailyActivity {
+  id                  String    @id @default(uuid())
+  studentId           String
+  student             User      @relation(fields: [studentId], references: [id])
+  date                DateTime
+  lessonsCompleted    Int       @default(0)
+  exercisesCompleted  Int       @default(0)
+  testsCompleted      Int       @default(0)
+  studyTimeMinutes    Int       @default(0)
+  pointsEarned        Int       @default(0)
+
+  @@unique([studentId, date])
+  @@index([studentId])
+  @@index([date])
+}
+
+// =============================================================================
+// Assignment Models
+// =============================================================================
+
+model Assignment {
+  id                String    @id @default(uuid())
+  teacherId         String
+  teacher           User      @relation(fields: [teacherId], references: [id])
+  title             String
+  description       String
+  instructions      String
+  dueDate           DateTime
+  maxScore          Float
+  attachments       String[]
+  isGroupAssignment Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  studentAssignments StudentAssignment[]
+
+  @@index([teacherId])
+  @@index([dueDate])
+}
+
+model StudentAssignment {
+  id              String           @id @default(uuid())
+  assignmentId    String
+  assignment      Assignment       @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  studentId       String
+  student         User             @relation(fields: [studentId], references: [id])
+  status          AssignmentStatus @default(PENDING)
+  submission      String?
+  submittedAt     DateTime?
+  score           Float?
+  feedback        String?
+  gradedAt        DateTime?
+  gradedBy        String?
+
+  @@index([assignmentId])
+  @@index([studentId])
+  @@index([status])
+}
+
+// =============================================================================
+// Communication Models
+// =============================================================================
+
+model Message {
+  id              String    @id @default(uuid())
+  senderId        String
+  sender          User      @relation("SentMessages", fields: [senderId], references: [id])
+  recipientId     String
+  recipient       User      @relation("ReceivedMessages", fields: [recipientId], references: [id])
+  type            String    // DIRECT, ANNOUNCEMENT
+  subject         String
+  content         String
+  isRead          Boolean   @default(false)
+  readAt          DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([senderId])
+  @@index([recipientId])
+  @@index([isRead])
+}
+
+model Announcement {
+  id              String    @id @default(uuid())
+  authorId        String
+  author          User      @relation(fields: [authorId], references: [id])
+  title           String
+  content         String
+  targetAudience  String    // all, students, teachers, specific
+  recipientIds    String[]
+  isPublished     Boolean   @default(false)
+  publishedAt     DateTime?
+  expiresAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([authorId])
+  @@index([isPublished])
+}
+
+model ChatSession {
+  id              String    @id @default(uuid())
+  studentId       String
+  student         User      @relation(fields: [studentId], references: [id])
+  startedAt       DateTime  @default(now())
+  endedAt         DateTime?
+  isActive        Boolean   @default(true)
+  messageCount    Int       @default(0)
+
+  messages        ChatMessage[]
+
+  @@index([studentId])
+  @@index([isActive])
+}
+
+model ChatMessage {
+  id              String      @id @default(uuid())
+  sessionId       String
+  session         ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role            String      // user, assistant
+  content         String
+  timestamp       DateTime    @default(now())
+  metadata        Json?
+
+  @@index([sessionId])
+}
+
+model Feedback {
+  id              String    @id @default(uuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  type            FeedbackType
+  subject         String
+  description     String
+  status          String    @default("pending") // pending, reviewed, resolved
+  adminResponse   String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+// =============================================================================
+// Reward Models
+// =============================================================================
+
+model Reward {
+  id              String      @id @default(uuid())
+  type            RewardType
+  name            String
+  description     String
+  icon            String
+  pointValue      Int
+  criteria        Json        // RewardCriteria
+  isActive        Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+
+  studentRewards  StudentReward[]
+
+  @@index([type])
+  @@index([isActive])
+}
+
+model StudentReward {
+  id              String    @id @default(uuid())
+  studentId       String
+  student         User      @relation(fields: [studentId], references: [id])
+  rewardId        String
+  reward          Reward    @relation(fields: [rewardId], references: [id])
+  earnedAt        DateTime  @default(now())
+  notified        Boolean   @default(false)
+
+  @@unique([studentId, rewardId])
+  @@index([studentId])
+}
+
+model PointTransaction {
+  id              String    @id @default(uuid())
+  studentId       String
+  student         User      @relation(fields: [studentId], references: [id])
+  points          Int
+  reason          String
+  sourceType      String    // lesson, exercise, test, streak, reward, bonus
+  sourceId        String?
+  createdAt       DateTime  @default(now())
+
+  @@index([studentId])
+  @@index([createdAt])
+}
+
+// =============================================================================
+// Admin Models
+// =============================================================================
+
+model SystemPerformance {
+  id                  String    @id @default(uuid())
+  timestamp           DateTime  @default(now())
+  cpuUsage            Float
+  memoryUsage         Float
+  activeUsers         Int
+  requestsPerMinute   Int
+  averageResponseTime Float
+  errorRate           Float
+
+  @@index([timestamp])
+}
+
+model MaintenanceLog {
+  id              String    @id @default(uuid())
+  adminId         String
+  type            String    // scheduled, emergency, update
+  title           String
+  description     String
+  startedAt       DateTime
+  endedAt         DateTime?
+  status          String    // scheduled, in_progress, completed, cancelled
+  affectedServices String[]
+
+  @@index([adminId])
+  @@index([status])
+}
+
+model SystemLog {
+  id              String    @id @default(uuid())
+  level           String    // info, warn, error, debug
+  message         String
+  metadata        Json?
+  source          String
+  timestamp       DateTime  @default(now())
+
+  @@index([level])
+  @@index([timestamp])
+}
